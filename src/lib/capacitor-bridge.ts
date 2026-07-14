@@ -1,8 +1,9 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { NexusBridge } from './plugin-def';
 
 const isNative = Capacitor.isNativePlatform();
 
-// ─── Web Search (uses native HTTP on iOS to bypass CORS) ───
+// ─── Web Search ───
 
 function parseDdgResults(html: string, count: number) {
   if (html.includes('challenge') || html.includes('captcha')) return { results: [], error: 'captcha' as const };
@@ -34,17 +35,10 @@ export async function webSearch(query: string, count = 10) {
   };
 
   if (isNative) {
-    // Use Capacitor's native HTTP plugin to bypass CORS
-    const { CapacitorHttp } = await import('@capacitor/core');
-    const res = await CapacitorHttp.request({
-      url,
-      method: 'GET',
-      headers,
-    });
+    const res = await CapacitorHttp.request({ url, method: 'GET', headers });
     return parseDdgResults(res.data as string, count);
   }
 
-  // Web fallback
   const res = await fetch(url, { headers });
   const html = await res.text();
   return parseDdgResults(html, count);
@@ -80,47 +74,37 @@ class NativeBridge {
 
   async createWebView() {
     if (!isNative) return;
-    const { NexusBridge } = await import('./plugin-def');
-    await NexusBridge.createWebView();
+    try { await NexusBridge.createWebView(); } catch (e) { console.error('createWebView failed', e); }
   }
 
   async navigate(url: string) {
-    if (!isNative) {
-      window.open(url, '_blank');
-      return;
-    }
-    const { NexusBridge } = await import('./plugin-def');
-    await NexusBridge.navigate({ url });
+    if (!isNative) { window.open(url, '_blank'); return; }
+    try { await NexusBridge.navigate({ url }); } catch (e) { console.error('navigate failed', e); }
   }
 
   async goBack() {
     if (!isNative) return;
-    const { NexusBridge } = await import('./plugin-def');
-    await NexusBridge.goBack();
+    try { await NexusBridge.goBack(); } catch {}
   }
 
   async goForward() {
     if (!isNative) return;
-    const { NexusBridge } = await import('./plugin-def');
-    await NexusBridge.goForward();
+    try { await NexusBridge.goForward(); } catch {}
   }
 
   async refresh() {
     if (!isNative) return;
-    const { NexusBridge } = await import('./plugin-def');
-    await NexusBridge.refresh();
+    try { await NexusBridge.refresh(); } catch {}
   }
 
   async showWebView() {
     if (!isNative) return;
-    const { NexusBridge } = await import('./plugin-def');
-    await NexusBridge.showWebView();
+    try { await NexusBridge.showWebView(); } catch {}
   }
 
   async hideWebView() {
     if (!isNative) return;
-    const { NexusBridge } = await import('./plugin-def');
-    await NexusBridge.hideWebView();
+    try { await NexusBridge.hideWebView(); } catch {}
   }
 }
 

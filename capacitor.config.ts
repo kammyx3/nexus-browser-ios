@@ -5,7 +5,6 @@ const config: CapacitorConfig = {
   appName: 'Nexus Browser',
   webDir: 'dist',
   bundledWebRuntime: false,
-  includePlugins: ['NexusBridge'],
   plugins: {
     CapacitorCookies: {
       enabled: false,
