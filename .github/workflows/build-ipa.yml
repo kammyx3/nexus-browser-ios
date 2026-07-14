@@ -29,11 +29,16 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync
 
-      - name: Build IPA (unsigned)
+      - name: List iOS project files
+        run: find ios -type f -name "*.xcodeproj" -o -name "*.xcworkspace" -o -name "*.app" | head -20
+
+      - name: Build IPA
         run: |
           cd ios/App
-          xcodebuild -workspace App.xcworkspace \
-            -scheme App \
+          xcodebuild -list 2>&1 | head -20
+          SCHEME=$(xcodebuild -list | grep -A1 "Schemes:" | tail -1 | xargs)
+          echo "Using scheme: $SCHEME"
+          xcodebuild -scheme "$SCHEME" \
             -configuration Release \
             -derivedDataPath ../../build \
             -destination generic/platform=iOS \
@@ -45,8 +50,17 @@ jobs:
       - name: Package IPA
         run: |
           mkdir -p Payload
-          cp -r build/Build/Products/Release-iphoneos/App.app Payload/
-          zip -r NexusBrowser.ipa Payload/
+          APP_PATH=$(find build -name "*.app" -type d | head -1)
+          echo "App path: $APP_PATH"
+          if [ -n "$APP_PATH" ]; then
+            cp -r "$APP_PATH" Payload/
+            zip -r NexusBrowser.ipa Payload/
+            ls -la NexusBrowser.ipa
+          else
+            # Try to find the .app somewhere else
+            find build -type d -name "*.app" | head -5
+            find /Users -type d -name "*.app" -path "*/Build/*" | head -5
+          fi
           rm -rf Payload
 
       - name: Upload IPA
