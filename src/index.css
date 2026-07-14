@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes slide-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.animate-slide-in {
+  animation: slide-in 0.2s ease-out;
+}
+
+@layer base {
+  * { @apply m-0 p-0 box-border; }
+  body {
+    @apply bg-nexus-bg text-nexus-text font-sans overflow-hidden;
+    height: 100vh;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+}
+
+@layer components {
+  .glass {
+    @apply bg-nexus-card/60 backdrop-blur-md border border-nexus-border/50;
+  }
+  .glass-sm {
+    @apply bg-nexus-card/40 backdrop-blur-sm border border-nexus-border/30;
+  }
+  .btn-nav {
+    @apply flex items-center justify-center w-9 h-9 rounded-xl
+           text-nexus-text-dim hover:text-nexus-text hover:bg-white/5
+           disabled:opacity-20 disabled:cursor-default disabled:hover:bg-transparent
+           transition-all duration-150;
+  }
+  .badge {
+    @apply text-[10px] font-semibold px-1.5 py-0.5 rounded leading-none;
+  }
+  .badge-idx { @apply badge bg-nexus-success/20 text-nexus-success; }
+  .badge-web { @apply badge bg-nexus-accent/20 text-nexus-accent; }
+}

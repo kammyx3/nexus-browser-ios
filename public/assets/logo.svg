@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#16213e"/>
+      <stop offset="100%" style="stop-color:#0f3460"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e94560"/>
+      <stop offset="100%" style="stop-color:#ff6b81"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer ring -->
+  <circle cx="100" cy="100" r="96" fill="url(#bg)"/>
+  <circle cx="100" cy="100" r="92" fill="none" stroke="url(#accent)" stroke-width="3"/>
+
+  <!-- Magnifying glass -->
+  <circle cx="82" cy="75" r="28" fill="none" stroke="#e0e0e0" stroke-width="4"/>
+  <line x1="102" y1="95" x2="125" y2="118" stroke="#e0e0e0" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Glow dot inside glass -->
+  <circle cx="75" cy="68" r="4" fill="#e94560" opacity="0.6"/>
+
+  <!-- N letter overlay -->
+  <text x="110" y="155" font-family="Arial Black, Arial, sans-serif" font-size="80" font-weight="900" fill="#e0e0e0" transform="skewX(-8)">N</text>
+
+  <!-- Sparkle dots -->
+  <circle cx="148" cy="40" r="3" fill="#e94560" opacity="0.8"/>
+  <circle cx="165" cy="55" r="2" fill="#e94560" opacity="0.5"/>
+  <circle cx="155" cy="35" r="1.5" fill="#e94560" opacity="0.3"/>
+</svg>

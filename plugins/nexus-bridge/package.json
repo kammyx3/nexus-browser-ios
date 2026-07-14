@@ -1,0 +1,19 @@
+{
+  "name": "nexus-bridge",
+  "version": "1.0.0",
+  "description": "Native browser WebView bridge for Nexus Browser",
+  "main": "dist/plugin.js",
+  "module": "dist/esm/plugin.js",
+  "types": "dist/esm/plugin.d.ts",
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    }
+  },
+  "scripts": {
+    "verify": "true"
+  },
+  "peerDependencies": {
+    "@capacitor/core": "^7.0.0"
+  }
+}
