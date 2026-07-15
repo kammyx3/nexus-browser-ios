@@ -7,7 +7,7 @@ Pod::Spec.new do |spec|
   spec.author = { 'Nexus' => 'nexus@localhost' }
   spec.source = { :path => '.' }
   spec.source_files = 'ios/**/*.{swift,h,m,mm}'
-  spec.ios.deployment_target = '16.0'
+  spec.ios.deployment_target = '15.0'
   spec.dependency 'Capacitor'
   spec.swift_version = '5.9'
 end
