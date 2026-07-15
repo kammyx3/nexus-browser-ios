@@ -230,8 +230,17 @@ public class NexusBridgePlugin: CAPPlugin {
     ]
   }
 
-  private func attach(_ webView: WKWebView) {
-    guard let shell = capacitorWebView, let parent = shell.superview else { return }
+  private func attach(_ webView: WKWebView, attempt: Int = 0) {
+    if webView.superview != nil { return }
+    guard let shell = capacitorWebView, let parent = shell.superview else {
+      if attempt < 40 {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self, weak webView] in
+          guard let self = self, let webView = webView else { return }
+          self.attach(webView, attempt: attempt + 1)
+        }
+      }
+      return
+    }
     parent.insertSubview(webView, aboveSubview: shell)
     webView.translatesAutoresizingMaskIntoConstraints = false
     NSLayoutConstraint.activate([
@@ -277,8 +286,24 @@ public class NexusBridgePlugin: CAPPlugin {
 extension NexusBridgePlugin: WKNavigationDelegate {
   public func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { if webView == activeTab?.webView { notifyState() } }
   public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { notifyState() }
-  public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { notifyState() }
-  public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { notifyState() }
+  public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { showNavigationError(error, in: webView) }
+  public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { showNavigationError(error, in: webView) }
+
+  private func showNavigationError(_ error: Error, in webView: WKWebView) {
+    let nsError = error as NSError
+    if nsError.code == NSURLErrorCancelled { notifyState(); return }
+    let message = error.localizedDescription
+      .replacingOccurrences(of: "&", with: "&amp;")
+      .replacingOccurrences(of: "<", with: "&lt;")
+      .replacingOccurrences(of: ">", with: "&gt;")
+    let html = """
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <style>body{font-family:-apple-system;background:#080d1b;color:#f5f7ff;padding:48px 24px}div{max-width:520px;margin:auto}h2{font-size:22px}p{color:#9aa6c2;line-height:1.5}button{border:0;border-radius:12px;padding:12px 18px;background:#ef4766;color:white;font-weight:600}</style>
+      <div><h2>Page couldn’t load</h2><p>\(message)</p><button onclick="location.reload()">Try again</button></div>
+      """
+    webView.loadHTMLString(html, baseURL: nil)
+    notifyState()
+  }
 }
 
 extension NexusBridgePlugin: WKUIDelegate {
