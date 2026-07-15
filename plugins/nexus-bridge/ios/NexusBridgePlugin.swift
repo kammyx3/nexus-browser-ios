@@ -268,7 +268,9 @@ public class NexusBridgePlugin: CAPPlugin {
   }
 
   private func notifyState() {
-    bridge?.triggerWindowJSEvent(eventName: "nexus:browserState", data: statePayload())
+    guard let data = try? JSONSerialization.data(withJSONObject: statePayload()),
+          let json = String(data: data, encoding: .utf8) else { return }
+    bridge?.triggerWindowJSEvent(eventName: "nexus:browserState", data: json)
   }
 }
 
