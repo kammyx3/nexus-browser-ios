@@ -20,13 +20,13 @@ button { color:inherit; }
 @keyframes spin { to { transform:rotate(360deg); } }
 .mobile-content { position:absolute; top:calc(54px + env(safe-area-inset-top)); bottom:calc(58px + env(safe-area-inset-bottom)); left:0; right:0; overflow:auto; background:var(--bg); }
 .bottom-toolbar { position:absolute; z-index:20; left:0; right:0; bottom:0; height:calc(58px + env(safe-area-inset-bottom)); padding:3px 8px env(safe-area-inset-bottom); display:grid; grid-template-columns:repeat(5,1fr); background:color-mix(in srgb,var(--surface) 96%,transparent); border-top:1px solid var(--line); }
-.bottom-toolbar button { border:0; background:transparent; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; color:var(--muted); }
+.bottom-toolbar button { min-width:0; padding:0; border:0; background:transparent; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; color:var(--muted); text-align:center; }
 .bottom-toolbar button>span { font-size:23px; line-height:25px; }
 .bottom-toolbar small { font-size:9px; }
 .bottom-toolbar .new-tab span { width:39px; height:39px; display:grid; place-items:center; border-radius:50%; color:white; background:var(--accent); margin-top:-13px; box-shadow:0 5px 18px #0006; }
 .tab-count { width:25px; height:25px; display:grid; place-items:center; border:2px solid currentColor; border-radius:7px; font-size:12px!important; }
 .home-screen { min-height:100%; padding:18vh 22px 30px; text-align:center; background:radial-gradient(circle at 50% 20%,#26375c 0,transparent 42%); }
-.home-screen img { width:74px; height:74px; }
+.home-screen img { display:block; width:74px; height:74px; margin:0 auto; object-fit:contain; }
 .home-screen h1 { margin:12px 0 3px; font-size:30px; }
 .home-screen>p { margin:0 0 25px; color:var(--muted); font-size:13px; }
 .home-screen form { display:flex; max-width:520px; margin:auto; padding:5px; border:1px solid var(--line); border-radius:17px; background:var(--surface); box-shadow:0 14px 45px #0003; }

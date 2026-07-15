@@ -18,16 +18,23 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build web app
         run: npx vite build
 
       - name: Add iOS platform
-        run: npx cap add ios
+        run: npx cap add ios --packagemanager CocoaPods
 
       - name: Sync Capacitor
-        run: npx cap sync
+        run: npx cap sync ios
+
+      - name: Verify Nexus native bridge
+        run: |
+          test -f ios/App/Podfile
+          grep -q "NexusBridge" ios/App/Podfile
+          grep -q "NexusBridge" ios/App/Podfile.lock
+          echo "NexusBridge is linked into the native iOS project."
 
       - name: List iOS project files
         run: find ios -type f -name "*.xcodeproj" -o -name "*.xcworkspace" -o -name "*.app" | head -20
@@ -36,9 +43,8 @@ jobs:
         run: |
           cd ios/App
           xcodebuild -list 2>&1 | head -20
-          SCHEME=$(xcodebuild -list | grep -A1 "Schemes:" | tail -1 | xargs)
-          echo "Using scheme: $SCHEME"
-          xcodebuild -scheme "$SCHEME" \
+          echo "Using App workspace and scheme"
+          xcodebuild -workspace App.xcworkspace -scheme App \
             -configuration Release \
             -derivedDataPath ../../build \
             -destination generic/platform=iOS \

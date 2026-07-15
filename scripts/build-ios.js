@@ -10,6 +10,7 @@ run('npx vite build');
 
 if (process.platform === 'darwin') {
   console.log('2. Synchronizing Capacitor and CocoaPods...');
+  if (!existsSync(resolve(root, 'ios', 'App', 'Podfile'))) run('npx cap add ios --packagemanager CocoaPods');
   run('npx cap sync ios');
   console.log('\nReady for Xcode: npx cap open ios');
 } else {
