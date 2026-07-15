@@ -9,6 +9,15 @@ type View = 'home' | 'loading' | 'results' | 'browsing';
 const emptyState: BrowserState = { tabId: '', url: '', title: '', isLoading: false, canGoBack: false, canGoForward: false, tabs: [] };
 const looksLikeUrl = (value: string) => /^https?:\/\//i.test(value) || (!/\s/.test(value) && /(?:\.|localhost)/i.test(value));
 const normalizeUrl = (value: string) => /^https?:\/\//i.test(value) ? value : `https://${value}`;
+const stored = (key: string, fallback = '') => { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } };
+const store = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch {} };
+const removeStored = (key: string) => { try { localStorage.removeItem(key); } catch {} };
+const readHistory = (): string[] => {
+  try {
+    const value = JSON.parse(stored('nexus-history', '[]'));
+    return Array.isArray(value) ? value.filter(item => typeof item === 'string') : [];
+  } catch { removeStored('nexus-history'); return []; }
+};
 
 export default function App() {
   const [view, setView] = useState<View>('home');
@@ -18,9 +27,9 @@ export default function App() {
   const [results, setResults] = useState<any[]>([]);
   const [tabsOpen, setTabsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [dark, setDark] = useState(localStorage.getItem('nexus-theme') !== 'light');
-  const [saveHistory, setSaveHistory] = useState(localStorage.getItem('nexus-save-history') !== 'false');
-  const [safeSearch, setSafeSearch] = useState(localStorage.getItem('nexus-safe-search') || 'blur');
+  const [dark, setDark] = useState(stored('nexus-theme') !== 'light');
+  const [saveHistory, setSaveHistory] = useState(stored('nexus-save-history') !== 'false');
+  const [safeSearch, setSafeSearch] = useState(stored('nexus-safe-search', 'blur'));
   const [proxyEnabled, setProxyEnabled] = useState(false);
   const [proxySupported, setProxySupported] = useState(true);
   const [proxyHost, setProxyHost] = useState('80-190-72-122.sslip.io');
@@ -53,7 +62,7 @@ export default function App() {
     }
   };
 
-  useEffect(() => { document.documentElement.dataset.theme = dark ? 'dark' : 'light'; localStorage.setItem('nexus-theme', dark ? 'dark' : 'light'); }, [dark]);
+  useEffect(() => { document.documentElement.dataset.theme = dark ? 'dark' : 'light'; store('nexus-theme', dark ? 'dark' : 'light'); }, [dark]);
 
   const search = useCallback(async (raw: string) => {
     const value = raw.trim();
@@ -63,8 +72,8 @@ export default function App() {
     await nativeBridge.hideWebView();
     setQuery(value); setAddress(value); setView('loading');
     if (saveHistory) {
-      const previous = JSON.parse(localStorage.getItem('nexus-history') || '[]').filter((item: string) => item !== value);
-      localStorage.setItem('nexus-history', JSON.stringify([value, ...previous].slice(0, 50)));
+      const previous = readHistory().filter(item => item !== value);
+      store('nexus-history', JSON.stringify([value, ...previous].slice(0, 50)));
     }
     try {
       const response = await webSearch(value, 30, safeSearch);
@@ -132,8 +141,8 @@ export default function App() {
 
     {settingsOpen && <Sheet title="Settings" onClose={closeSettings}>
       <SettingToggle label="Dark appearance" detail="Use the dark Nexus theme" value={dark} onChange={setDark} />
-      <SettingToggle label="Save search history" detail="Stored only on this iPhone" value={saveHistory} onChange={value => { setSaveHistory(value); localStorage.setItem('nexus-save-history', String(value)); }} />
-      <div className="setting-row vertical"><div><strong>Safe Search</strong><p>Control sensitive results</p></div><select value={safeSearch} onChange={event => { setSafeSearch(event.target.value); localStorage.setItem('nexus-safe-search', event.target.value); }}><option value="off">No filter</option><option value="blur">Blur</option><option value="filter">Filter</option></select></div>
+      <SettingToggle label="Save search history" detail="Stored only on this iPhone" value={saveHistory} onChange={value => { setSaveHistory(value); store('nexus-save-history', String(value)); }} />
+      <div className="setting-row vertical"><div><strong>Safe Search</strong><p>Control sensitive results</p></div><select value={safeSearch} onChange={event => { setSafeSearch(event.target.value); store('nexus-safe-search', event.target.value); }}><option value="off">No filter</option><option value="blur">Blur</option><option value="filter">Filter</option></select></div>
       <div className="setting-card proxy-card">
         <div className="proxy-heading"><div><strong>Nexus protection</strong><p>Encrypt and route only Nexus website traffic through your VPS.</p></div><input type="checkbox" checked={proxyEnabled} disabled={!proxySupported} onChange={event => setProxyEnabled(event.target.checked)} /></div>
         {!proxySupported ? <p className="proxy-status error">Requires iOS 17 or newer.</p> : <>
@@ -146,14 +155,14 @@ export default function App() {
           <p className="privacy-note">Fail-closed is enabled: pages will not fall back to your regular connection if the VPS is unavailable. Other iPhone apps are unaffected.</p>
         </>}
       </div>
-      <button className="danger-button" onClick={() => { localStorage.removeItem('nexus-history'); }}>Clear search history</button>
+      <button className="danger-button" onClick={() => removeStored('nexus-history')}>Clear search history</button>
     </Sheet>}
   </main>;
 }
 
 function Home({ onSearch }: { onSearch: (value: string) => void }) {
   const [value, setValue] = useState('');
-  const suggestions = useMemo(() => JSON.parse(localStorage.getItem('nexus-history') || '[]').slice(0, 5), []);
+  const suggestions = useMemo(() => readHistory().slice(0, 5), []);
   return <div className="home-screen"><img src="./assets/logo.svg" alt="Nexus" /><h1>Nexus</h1><p>Private browsing, built for your phone.</p><form onSubmit={event => { event.preventDefault(); onSearch(value); }}><input value={value} onChange={event => setValue(event.target.value)} placeholder="Search the web" autoCapitalize="none" /><button>Go</button></form>{suggestions.length > 0 && <div className="suggestions">{suggestions.map((item: string) => <button key={item} onClick={() => onSearch(item)}>↗ {item}</button>)}</div>}</div>;
 }
 
