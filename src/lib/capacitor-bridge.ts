@@ -30,7 +30,17 @@ class NativeBridge {
   constructor() {
     if (isNative) {
       window.addEventListener('nexus:browserState', ((e: CustomEvent) => {
-        const state: BrowserState = e.detail;
+        const payload = (e as any).detail ?? e as any;
+        if (!payload || !Array.isArray(payload.tabs)) return;
+        const state: BrowserState = {
+          tabId: typeof payload.tabId === 'string' ? payload.tabId : '',
+          url: typeof payload.url === 'string' ? payload.url : '',
+          title: typeof payload.title === 'string' ? payload.title : '',
+          isLoading: Boolean(payload.isLoading),
+          canGoBack: Boolean(payload.canGoBack),
+          canGoForward: Boolean(payload.canGoForward),
+          tabs: payload.tabs,
+        };
         this.listeners.forEach(cb => cb(state));
       }) as EventListener);
     }
