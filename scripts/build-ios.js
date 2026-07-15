@@ -1,24 +1,24 @@
-/**
- * Build script for Nexus Browser iOS
- *
- * Prerequisites:
- *   1. macOS with Xcode 15+
- *   2. Node.js 18+
- *   3. CocoaPods (`sudo gem install cocoapods`)
- *
- * Steps:
- *   npm run build:ios    # Build web app + sync Capacitor
- *   npx cap open ios     # Open in Xcode
- *   # In Xcode: set signing team, build to device
- */
+import { execSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
-console.log('1. Building web assets...');
-require('child_process').execSync('npx vite build', { stdio: 'inherit', cwd: __dirname + '/..' });
+const root = resolve(import.meta.dirname, '..');
+const run = command => execSync(command, { cwd: root, stdio: 'inherit' });
 
-console.log('2. Syncing Capacitor...');
-require('child_process').execSync('npx cap sync', { stdio: 'inherit', cwd: __dirname + '/..' });
+console.log('1. Building the mobile web application...');
+run('npx vite build');
 
-console.log('\n✓ Done! Open the project in Xcode:');
-console.log('  cd nexus-ios');
-console.log('  npx cap open ios');
-console.log('\nThen select your team under Signing & Capabilities and build to your device.');
+if (process.platform === 'darwin') {
+  console.log('2. Synchronizing Capacitor and CocoaPods...');
+  run('npx cap sync ios');
+  console.log('\nReady for Xcode: npx cap open ios');
+} else {
+  const iosProject = resolve(root, 'ios');
+  if (existsSync(iosProject)) {
+    console.log('2. Copying web assets into the local iOS project...');
+    run('npx cap copy ios');
+  } else {
+    console.log('2. No local iOS project found; the GitHub macOS workflow will generate it.');
+  }
+  console.log('\nWindows preparation complete. CocoaPods and IPA compilation run on the GitHub macOS workflow.');
+}

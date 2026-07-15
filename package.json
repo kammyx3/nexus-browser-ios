@@ -8,7 +8,7 @@
     "build": "vite build",
     "cap:add:ios": "npx cap add ios",
     "cap:sync": "npx cap sync",
-    "build:ios": "vite build && npx cap sync"
+    "build:ios": "node scripts/build-ios.js"
   },
   "dependencies": {
     "@capacitor/core": "^8.4.2",

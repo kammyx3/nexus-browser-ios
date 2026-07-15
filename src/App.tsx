@@ -1,236 +1,166 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { webSearch, nativeBridge, BrowserState } from './lib/capacitor-bridge';
+import { BrowserTab } from './lib/plugin-def';
+import { BrowserState, nativeBridge, webSearch } from './lib/capacitor-bridge';
 
 const isNative = Capacitor.isNativePlatform();
+type View = 'home' | 'loading' | 'results' | 'browsing';
 
-function isUrl(input: string) {
-  if (/^https?:\/\//i.test(input)) return true;
-  if (/^[\w-]+\.[\w-]{2,}(?:\/|$)/.test(input)) return true;
-  if (/\s/.test(input)) return false;
-  return /\./.test(input);
-}
-
-function formatUrl(input: string) {
-  if (/^https?:\/\//i.test(input)) return input;
-  return 'https://' + input;
-}
+const emptyState: BrowserState = { tabId: '', url: '', title: '', isLoading: false, canGoBack: false, canGoForward: false, tabs: [] };
+const looksLikeUrl = (value: string) => /^https?:\/\//i.test(value) || (!/\s/.test(value) && /(?:\.|localhost)/i.test(value));
+const normalizeUrl = (value: string) => /^https?:\/\//i.test(value) ? value : `https://${value}`;
 
 export default function App() {
-  const [viewState, setViewState] = useState<'home' | 'loading' | 'results' | 'browsing'>('home');
+  const [view, setView] = useState<View>('home');
+  const [browser, setBrowser] = useState<BrowserState>(emptyState);
+  const [address, setAddress] = useState('');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<any[]>([]);
-  const [browserState, setBrowserState] = useState<BrowserState>({
-    url: '', title: '', isLoading: false, canGoBack: false, canGoForward: false,
-  });
-  const [searchInput, setSearchInput] = useState('');
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [tabsOpen, setTabsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [dark, setDark] = useState(localStorage.getItem('nexus-theme') !== 'light');
+  const [saveHistory, setSaveHistory] = useState(localStorage.getItem('nexus-save-history') !== 'false');
+  const [safeSearch, setSafeSearch] = useState(localStorage.getItem('nexus-safe-search') || 'blur');
+  const [proxyEnabled, setProxyEnabled] = useState(false);
+  const [proxySupported, setProxySupported] = useState(true);
+  const [proxyHost, setProxyHost] = useState('80-190-72-122.sslip.io');
+  const [proxyPort, setProxyPort] = useState('8443');
+  const [proxyUsername, setProxyUsername] = useState('');
+  const [proxyPassword, setProxyPassword] = useState('');
+  const [proxyMessage, setProxyMessage] = useState('');
 
   useEffect(() => {
-    nativeBridge.onState(setBrowserState);
+    nativeBridge.onState(state => {
+      setBrowser(state);
+      if (state.url) { setAddress(state.url); setView('browsing'); }
+    });
     nativeBridge.createWebView();
-
-    if (isNative) {
-      // Keyboard handling — prevents page from shifting
-      import('@capacitor/keyboard').then(({ Keyboard }) => {
-        Keyboard.addListener('keyboardWillShow', (info) => {
-          setKeyboardHeight(info.keyboardHeight);
-        });
-        Keyboard.addListener('keyboardWillHide', () => {
-          setKeyboardHeight(0);
-        });
-      }).catch(() => {});
-    }
+    nativeBridge.getProxyStatus().then(status => {
+      setProxyEnabled(status.enabled); setProxySupported(status.supported);
+      setProxyHost(status.host); setProxyPort(String(status.port)); setProxyUsername(status.username);
+    }).catch(() => setProxySupported(false));
   }, []);
 
-  const doSearch = useCallback(async (input: string) => {
-    const trimmed = input.trim();
-    if (!trimmed) return;
-
-    if (isUrl(trimmed)) {
-      await nativeBridge.navigate(formatUrl(trimmed));
-      setViewState('browsing');
-      return;
+  const saveProxy = async () => {
+    setProxyMessage('Applying protection…');
+    try {
+      const status = await nativeBridge.setProxy({ enabled: proxyEnabled, host: proxyHost.trim(), port: Number(proxyPort), username: proxyUsername, password: proxyPassword });
+      setProxyEnabled(status.enabled);
+      setProxyMessage(status.enabled ? 'Protected. Nexus tabs now use your VPS.' : 'Protection is off.');
+      setProxyPassword('');
+    } catch (error) {
+      setProxyMessage(error instanceof Error ? error.message : 'Could not apply proxy settings.');
     }
+  };
 
-    setViewState('loading');
-    setQuery(trimmed);
-    const data = await webSearch(trimmed, 10);
-    if (data.error) {
-      // Treat as empty results on error
-      setResults([]);
-      setViewState('results');
-      return;
+  useEffect(() => { document.documentElement.dataset.theme = dark ? 'dark' : 'light'; localStorage.setItem('nexus-theme', dark ? 'dark' : 'light'); }, [dark]);
+
+  const search = useCallback(async (raw: string) => {
+    const value = raw.trim();
+    if (!value) return;
+    setTabsOpen(false);
+    if (looksLikeUrl(value)) { await nativeBridge.navigate(normalizeUrl(value)); setView('browsing'); return; }
+    await nativeBridge.hideWebView();
+    setQuery(value); setAddress(value); setView('loading');
+    if (saveHistory) {
+      const previous = JSON.parse(localStorage.getItem('nexus-history') || '[]').filter((item: string) => item !== value);
+      localStorage.setItem('nexus-history', JSON.stringify([value, ...previous].slice(0, 50)));
     }
-    setResults(data.results);
-    setViewState('results');
-  }, []);
+    try {
+      const response = await webSearch(value, 30, safeSearch);
+      setResults(response.results || []);
+    } catch (error) {
+      setResults([{ title: 'Private search is not configured', url: 'nexus://settings', snippet: error instanceof Error ? error.message : 'Open Settings and enter your VPS credentials.', source: 'Nexus' }]);
+    }
+    setView('results');
+  }, [safeSearch, saveHistory]);
 
-  const handleResultClick = useCallback(async (result: any) => {
-    await nativeBridge.navigate(result.url);
-    setViewState('browsing');
-  }, []);
+  const newTab = async (incognito = false) => {
+    await nativeBridge.createTab(undefined, incognito);
+    await nativeBridge.hideWebView();
+    setAddress(''); setView('home'); setTabsOpen(false);
+  };
 
-  const handleBack = useCallback(() => nativeBridge.goBack(), []);
-  const handleForward = useCallback(() => nativeBridge.goForward(), []);
-  const handleRefresh = useCallback(() => nativeBridge.refresh(), []);
+  const selectTab = async (tab: BrowserTab) => {
+    await nativeBridge.switchTab(tab.id);
+    setAddress(tab.url); setView(tab.url ? 'browsing' : 'home'); setTabsOpen(false);
+  };
 
-  return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      display: 'flex', flexDirection: 'column',
-      background: '#121828',
-      paddingBottom: keyboardHeight,
-      transition: 'padding-bottom 0.25s ease-out',
-    }}>
-      {/* Toolbar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px',
-        paddingTop: 'env(safe-area-inset-top, 6px)',
-        background: '#1a2440', flexShrink: 0,
-      }}>
-        <NavBtn onClick={handleBack} disabled={!browserState.canGoBack}>
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-        </NavBtn>
-        <NavBtn onClick={handleForward} disabled={!browserState.canGoForward}>
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 6 15 12 9 18"/></svg>
-        </NavBtn>
-        <NavBtn onClick={handleRefresh}>
-          {browserState.isLoading ? (
-            <div style={{ width: 18, height: 18, border: '2px solid #e94560', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-          ) : (
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-          )}
-        </NavBtn>
+  const home = async () => { await nativeBridge.hideWebView(); setAddress(''); setView('home'); };
+  const openTabs = async () => { await nativeBridge.hideWebView(); setTabsOpen(true); };
+  const closeTabs = async () => { setTabsOpen(false); if (view === 'browsing') await nativeBridge.showWebView(); };
+  const openSettings = async () => { await nativeBridge.hideWebView(); setSettingsOpen(true); };
+  const closeSettings = async () => { setSettingsOpen(false); if (view === 'browsing') await nativeBridge.showWebView(); };
+  const tabCount = Math.max(1, browser.tabs?.length || 0);
 
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', background: '#0f3460', borderRadius: 12, padding: '0 10px', border: '1px solid rgba(42,74,122,0.5)' }}>
-          {viewState === 'browsing' ? (
-            <input type="text" value={browserState.url} readOnly
-              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#d0d0e0', fontSize: 15, padding: '10px 0', fontFamily: 'inherit' }}
-            />
-          ) : (
-            <input type="text" value={searchInput}
-              onChange={e => setSearchInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && searchInput.trim()) { setViewState('home'); doSearch(searchInput); } }}
-              placeholder="Search or enter URL..."
-              spellCheck={false}
-              autoFocus
-              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#d0d0e0', fontSize: 15, padding: '10px 0', fontFamily: 'inherit', placeholder: '#606080' }}
-            />
-          )}
-        </div>
+  return <main className="ios-app">
+    <header className="mobile-toolbar">
+      <button className="icon-button" disabled={!browser.canGoBack} onClick={() => nativeBridge.goBack()} aria-label="Back">‹</button>
+      <form className="address-pill" onSubmit={event => { event.preventDefault(); search(address); }}>
+        {browser.tabs?.find(tab => tab.id === browser.tabId)?.incognito && <span className="private-dot">●</span>}
+        <input value={address} onChange={event => setAddress(event.target.value)} placeholder="Search or enter URL" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+        {browser.isLoading && <span className="spinner small" />}
+      </form>
+      <button className="icon-button" onClick={() => browser.isLoading ? nativeBridge.refresh() : nativeBridge.refresh()} aria-label="Reload">↻</button>
+    </header>
 
-        {viewState === 'browsing' && (
-          <NavBtn onClick={async () => { await nativeBridge.hideWebView(); setViewState('home'); setSearchInput(''); }}>
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          </NavBtn>
-        )}
+    <section className="mobile-content">
+      {view === 'home' && <Home onSearch={search} />}
+      {view === 'loading' && <ResultSkeleton />}
+      {view === 'results' && <Results query={query} results={results} onOpen={async result => {
+        if (result.url === 'nexus://settings') { await openSettings(); return; }
+        await nativeBridge.navigate(result.url); setView('browsing');
+      }} />}
+    </section>
+
+    <nav className="bottom-toolbar">
+      <button onClick={home}><span>⌂</span><small>Home</small></button>
+      <button disabled={!browser.canGoForward} onClick={() => nativeBridge.goForward()}><span>›</span><small>Forward</small></button>
+      <button className="new-tab" onClick={() => newTab(false)}><span>＋</span></button>
+      <button onClick={openTabs}><span className="tab-count">{tabCount}</span><small>Tabs</small></button>
+      <button onClick={openSettings}><span>⚙</span><small>Settings</small></button>
+    </nav>
+
+    {tabsOpen && <Sheet title="Tabs" onClose={closeTabs}>
+      <div className="sheet-actions"><button onClick={() => newTab(false)}>＋ New tab</button><button className="private" onClick={() => newTab(true)}>● Private tab</button></div>
+      <div className="tab-grid">{browser.tabs?.map(tab => <article key={tab.id} className={tab.id === browser.tabId ? 'active' : ''} onClick={() => selectTab(tab)}>
+        <div className="tab-preview">{tab.incognito ? '●' : 'N'}</div>
+        <div><strong>{tab.title || 'New Tab'}</strong><p>{tab.url || 'Nexus Home'}</p></div>
+        <button aria-label="Close tab" onClick={event => { event.stopPropagation(); nativeBridge.closeTab(tab.id); }}>×</button>
+      </article>)}</div>
+    </Sheet>}
+
+    {settingsOpen && <Sheet title="Settings" onClose={closeSettings}>
+      <SettingToggle label="Dark appearance" detail="Use the dark Nexus theme" value={dark} onChange={setDark} />
+      <SettingToggle label="Save search history" detail="Stored only on this iPhone" value={saveHistory} onChange={value => { setSaveHistory(value); localStorage.setItem('nexus-save-history', String(value)); }} />
+      <div className="setting-row vertical"><div><strong>Safe Search</strong><p>Control sensitive results</p></div><select value={safeSearch} onChange={event => { setSafeSearch(event.target.value); localStorage.setItem('nexus-safe-search', event.target.value); }}><option value="off">No filter</option><option value="blur">Blur</option><option value="filter">Filter</option></select></div>
+      <div className="setting-card proxy-card">
+        <div className="proxy-heading"><div><strong>Nexus protection</strong><p>Encrypt and route only Nexus website traffic through your VPS.</p></div><input type="checkbox" checked={proxyEnabled} disabled={!proxySupported} onChange={event => setProxyEnabled(event.target.checked)} /></div>
+        {!proxySupported ? <p className="proxy-status error">Requires iOS 17 or newer.</p> : <>
+          <label>Server<input value={proxyHost} onChange={event => setProxyHost(event.target.value)} autoCapitalize="none" autoCorrect="off" placeholder="proxy.example.com" /></label>
+          <label>Port<input value={proxyPort} onChange={event => setProxyPort(event.target.value.replace(/\D/g, ''))} inputMode="numeric" /></label>
+          <label>Username<input value={proxyUsername} onChange={event => setProxyUsername(event.target.value)} autoCapitalize="none" autoCorrect="off" /></label>
+          <label>Password<input value={proxyPassword} onChange={event => setProxyPassword(event.target.value)} type="password" placeholder="Leave blank only if unchanged" /></label>
+          <button className="proxy-save" onClick={saveProxy}>Apply protection</button>
+          {proxyMessage && <p className="proxy-status">{proxyMessage}</p>}
+          <p className="privacy-note">Fail-closed is enabled: pages will not fall back to your regular connection if the VPS is unavailable. Other iPhone apps are unaffected.</p>
+        </>}
       </div>
-
-      {/* Content */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#0a0f1e' }}>
-        {viewState === 'home' && <HomePage onSearch={doSearch} />}
-        {viewState === 'results' && (
-          <ResultsPage query={query} results={results} onResultClick={handleResultClick} onSearch={doSearch} />
-        )}
-        {viewState === 'loading' && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0f1e' }}>
-            <div style={{ width: 32, height: 32, border: '2px solid #e94560', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-          </div>
-        )}
-      </div>
-    </div>
-  );
+      <button className="danger-button" onClick={() => { localStorage.removeItem('nexus-history'); }}>Clear search history</button>
+    </Sheet>}
+  </main>;
 }
 
-// ─── Components ───
-
-function NavBtn({ onClick, disabled, children }: { onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick} disabled={disabled}
-      style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 36, height: 36, borderRadius: 10, border: 'none',
-        color: disabled ? 'rgba(160,160,192,0.3)' : '#a0a0c0',
-        background: 'transparent', cursor: disabled ? 'default' : 'pointer',
-        flexShrink: 0,
-      }}
-      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-    >
-      {children}
-    </button>
-  );
+function Home({ onSearch }: { onSearch: (value: string) => void }) {
+  const [value, setValue] = useState('');
+  const suggestions = useMemo(() => JSON.parse(localStorage.getItem('nexus-history') || '[]').slice(0, 5), []);
+  return <div className="home-screen"><img src="./assets/logo.svg" alt="Nexus" /><h1>Nexus</h1><p>Private browsing, built for your phone.</p><form onSubmit={event => { event.preventDefault(); onSearch(value); }}><input value={value} onChange={event => setValue(event.target.value)} placeholder="Search the web" autoCapitalize="none" /><button>Go</button></form>{suggestions.length > 0 && <div className="suggestions">{suggestions.map((item: string) => <button key={item} onClick={() => onSearch(item)}>↗ {item}</button>)}</div>}</div>;
 }
 
-function HomePage({ onSearch }: { onSearch: (q: string) => void }) {
-  const [q, setQ] = useState('');
-  return (
-    <div style={{
-      position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center', padding: '0 24px',
-      background: 'linear-gradient(135deg, #0a0f1e 0%, #121828 50%, #1a2440 100%)',
-    }}>
-      <svg width="72" height="72" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style={{ marginBottom: 20 }}>
-        <defs>
-          <linearGradient id="bg3" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#16213e"/><stop offset="100%" stopColor="#1a3050"/>
-          </linearGradient>
-        </defs>
-        <circle cx="100" cy="100" r="96" fill="url(#bg3)"/>
-        <circle cx="100" cy="100" r="92" fill="none" stroke="#e94560" strokeWidth="3"/>
-        <circle cx="82" cy="75" r="28" fill="none" stroke="#d0d0e0" strokeWidth="4"/>
-        <line x1="102" y1="95" x2="125" y2="118" stroke="#d0d0e0" strokeWidth="5" strokeLinecap="round"/>
-        <text x="110" y="155" fontFamily="Arial" fontSize="80" fontWeight="bold" fill="#d0d0e0" transform="skewX(-8)">N</text>
-      </svg>
-
-      <div style={{ display: 'flex', alignItems: 'center', width: '100%', maxWidth: 400, background: 'rgba(26,36,64,0.8)', backdropFilter: 'blur(8px)', borderRadius: 16, padding: '0 14px', border: '1px solid rgba(42,74,122,0.5)' }}>
-        <input type="text" value={q} onChange={e => setQ(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && q.trim()) onSearch(q.trim()); }}
-          placeholder="Search with Nexus..."
-          spellCheck={false} autoFocus
-          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#d0d0e0', fontSize: 16, padding: '14px 0', fontFamily: 'inherit' }}
-        />
-      </div>
-      <p style={{ color: '#606080', fontSize: 12, marginTop: 16, textAlign: 'center' }}>Enter a URL or search query</p>
-    </div>
-  );
+function Results({ query, results, onOpen }: { query: string; results: any[]; onOpen: (result: any) => void }) {
+  const host = (url: string) => { try { return new URL(url).hostname; } catch { return url; } };
+  return <div className="results"><div className="results-heading"><h2>{query}</h2><span>{results.length} results</span></div>{results.length ? results.map((result, index) => <button className="result" key={`${result.url}-${index}`} onClick={() => onOpen(result)}><small>{host(result.url)}</small><strong>{result.title}</strong><p>{result.snippet}</p></button>) : <div className="empty"><strong>No results found</strong><p>Check your connection and try again.</p></div>}</div>;
 }
-
-function ResultsPage({ query, results, onResultClick, onSearch }: {
-  query: string; results: any[]; onResultClick: (r: any) => void; onSearch: (q: string) => void;
-}) {
-  const [searchInput, setSearchInput] = useState(query);
-
-  return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: '#0a0f1e' }}>
-      <div style={{ flexShrink: 0, padding: '10px 12px 8px', borderBottom: '1px solid rgba(42,74,122,0.3)', background: '#121828' }}>
-        <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(26,36,64,0.8)', borderRadius: 12, padding: '0 10px', border: '1px solid rgba(42,74,122,0.5)', marginBottom: 8 }}>
-          <input type="text" value={searchInput}
-            onChange={e => setSearchInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && searchInput.trim()) onSearch(searchInput.trim()); }}
-            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#d0d0e0', fontSize: 14, padding: '10px 0', fontFamily: 'inherit' }}
-          />
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#c0c0d0' }}>{query}</span>
-          <span style={{ fontSize: 11, color: '#606080' }}>{results.length} results</span>
-        </div>
-      </div>
-
-      <div style={{ flex: 1, overflowY: 'auto' }}>
-        {results.map((r, i) => {
-          const snippet = (r.snippet || '').substring(0, 200);
-          return (
-            <div key={i} onClick={() => onResultClick(r)}
-              style={{ padding: '14px 16px', borderBottom: '1px solid rgba(42,74,122,0.15)', cursor: 'pointer' }}>
-              <h3 style={{ fontSize: 15, fontWeight: 600, color: '#6ab0ff', marginBottom: 2, lineHeight: 1.3 }}>{r.title}</h3>
-              <p style={{ fontSize: 12, color: '#2eaa60', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.url}</p>
-              {snippet && <p style={{ fontSize: 12, color: '#9090a8', lineHeight: 1.5 }}>{snippet}...</p>}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+function ResultSkeleton() { return <div className="results skeleton-list">{[1,2,3,4,5].map(item => <div className="skeleton" key={item}><i/><b/><span/></div>)}</div>; }
+function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) { return <div className="sheet-backdrop" onClick={onClose}><section className="sheet" onClick={event => event.stopPropagation()}><header><h2>{title}</h2><button onClick={onClose}>Done</button></header><div className="sheet-body">{children}</div></section></div>; }
+function SettingToggle({ label, detail, value, onChange }: { label: string; detail: string; value: boolean; onChange: (value: boolean) => void }) { return <label className="setting-row"><div><strong>{label}</strong><p>{detail}</p></div><input type="checkbox" checked={value} onChange={event => onChange(event.target.checked)} /></label>; }

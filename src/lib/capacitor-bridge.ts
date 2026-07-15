@@ -1,57 +1,25 @@
-import { Capacitor, CapacitorHttp } from '@capacitor/core';
-import { NexusBridge } from './plugin-def';
+import { Capacitor } from '@capacitor/core';
+import { BrowserTab, NexusBridge, ProxySettings, ProxyStatus } from './plugin-def';
 
 const isNative = Capacitor.isNativePlatform();
 
 // ─── Web Search ───
 
-function parseDdgResults(html: string, count: number) {
-  if (html.includes('challenge') || html.includes('captcha')) return { results: [], error: 'captcha' as const };
-
-  const results: any[] = [];
-  const blocks = html.split('class="result results_links');
-  for (let i = 1; i < blocks.length && results.length < count; i++) {
-    const block = blocks[i];
-    const titleMatch = block.match(/class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/);
-    if (!titleMatch) continue;
-    const rawUrl = titleMatch[1];
-    const urlMatch = rawUrl.match(/uddg=([^&]+)/);
-    const url = urlMatch ? decodeURIComponent(urlMatch[1]) : rawUrl;
-    const title = titleMatch[2].replace(/<[^>]*>/g, '').trim();
-    const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
-    const snippet = snippetMatch ? snippetMatch[1].replace(/<[^>]*>/g, '').trim() : '';
-    results.push({ title, url, snippet, source: 'web' });
-  }
-  return { results, error: null as null };
-}
-
-export async function webSearch(query: string, count = 10) {
-  const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-  const headers: Record<string, string> = {
-    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Referer': 'https://duckduckgo.com/',
-  };
-
-  if (isNative) {
-    const res = await CapacitorHttp.request({ url, method: 'GET', headers });
-    return parseDdgResults(res.data as string, count);
-  }
-
-  const res = await fetch(url, { headers });
-  const html = await res.text();
-  return parseDdgResults(html, count);
+export async function webSearch(query: string, count = 10, safeSearch = 'blur') {
+  if (!isNative) throw new Error('Private search is available in the Nexus iOS app.');
+  return NexusBridge.search({ query, count, safeSearch });
 }
 
 // ─── Native Bridge ───
 
 export interface BrowserState {
+  tabId: string;
   url: string;
   title: string;
   isLoading: boolean;
   canGoBack: boolean;
   canGoForward: boolean;
+  tabs: BrowserTab[];
 }
 
 type StateCallback = (state: BrowserState) => void;
@@ -82,6 +50,15 @@ class NativeBridge {
     try { await NexusBridge.navigate({ url }); } catch (e) { console.error('navigate failed', e); }
   }
 
+  async createTab(url?: string, incognito = false) {
+    if (!isNative) return { id: String(Date.now()) };
+    return NexusBridge.createTab({ url, incognito });
+  }
+
+  async switchTab(id: string) { if (isNative) await NexusBridge.switchTab({ id }); }
+  async closeTab(id: string) { if (isNative) await NexusBridge.closeTab({ id }); }
+  async listTabs() { return isNative ? NexusBridge.listTabs() : { tabs: [], activeTabId: '' }; }
+
   async goBack() {
     if (!isNative) return;
     try { await NexusBridge.goBack(); } catch {}
@@ -105,6 +82,16 @@ class NativeBridge {
   async hideWebView() {
     if (!isNative) return;
     try { await NexusBridge.hideWebView(); } catch {}
+  }
+
+  async getProxyStatus(): Promise<ProxyStatus> {
+    if (!isNative) return { supported: false, enabled: false, host: '80-190-72-122.sslip.io', port: 8443, username: '', configured: false };
+    return NexusBridge.getProxyStatus();
+  }
+
+  async setProxy(settings: ProxySettings): Promise<ProxyStatus> {
+    if (!isNative) throw new Error('The Nexus proxy is available only in the iOS app.');
+    return NexusBridge.setProxy(settings);
   }
 }
 
