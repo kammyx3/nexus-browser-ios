@@ -104,13 +104,13 @@ export default function App() {
 
   return <main className="ios-app">
     <header className="mobile-toolbar">
-      <button className="icon-button" disabled={!browser.canGoBack} onClick={() => nativeBridge.goBack()} aria-label="Back">‹</button>
+      <button className="icon-button" disabled={!browser.canGoBack} onClick={() => nativeBridge.goBack()} aria-label="Back"><AppIcon name="back" /></button>
       <form className="address-pill" onSubmit={event => { event.preventDefault(); search(address); }}>
         {browser.tabs?.find(tab => tab.id === browser.tabId)?.incognito && <span className="private-dot">●</span>}
         <input value={address} onChange={event => setAddress(event.target.value)} placeholder="Search or enter URL" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
         {browser.isLoading && <span className="spinner small" />}
       </form>
-      <button className="icon-button" onClick={() => browser.isLoading ? nativeBridge.refresh() : nativeBridge.refresh()} aria-label="Reload">↻</button>
+      <button className="icon-button" onClick={() => nativeBridge.refresh()} aria-label="Reload"><AppIcon name="reload" /></button>
     </header>
 
     <section className="mobile-content">
@@ -123,11 +123,11 @@ export default function App() {
     </section>
 
     <nav className="bottom-toolbar">
-      <button onClick={home}><span>⌂</span><small>Home</small></button>
-      <button disabled={!browser.canGoForward} onClick={() => nativeBridge.goForward()}><span>›</span><small>Forward</small></button>
-      <button className="new-tab" onClick={() => newTab(false)}><span>＋</span></button>
-      <button onClick={openTabs}><span className="tab-count">{tabCount}</span><small>Tabs</small></button>
-      <button onClick={openSettings}><span>⚙</span><small>Settings</small></button>
+      <button onClick={home}><AppIcon name="home" /><small>Home</small></button>
+      <button disabled={!browser.canGoForward} onClick={() => nativeBridge.goForward()}><AppIcon name="forward" /><small>Forward</small></button>
+      <button className="new-tab" onClick={() => newTab(false)} aria-label="New tab"><span><AppIcon name="plus" /></span></button>
+      <button onClick={openTabs}><span className="tab-count"><span>{tabCount}</span></span><small>Tabs</small></button>
+      <button onClick={openSettings}><AppIcon name="settings" /><small>Settings</small></button>
     </nav>
 
     {tabsOpen && <Sheet title="Tabs" onClose={closeTabs}>
@@ -173,3 +173,15 @@ function Results({ query, results, onOpen }: { query: string; results: any[]; on
 function ResultSkeleton() { return <div className="results skeleton-list">{[1,2,3,4,5].map(item => <div className="skeleton" key={item}><i/><b/><span/></div>)}</div>; }
 function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) { return <div className="sheet-backdrop" onClick={onClose}><section className="sheet" onClick={event => event.stopPropagation()}><header><h2>{title}</h2><button onClick={onClose}>Done</button></header><div className="sheet-body">{children}</div></section></div>; }
 function SettingToggle({ label, detail, value, onChange }: { label: string; detail: string; value: boolean; onChange: (value: boolean) => void }) { return <label className="setting-row"><div><strong>{label}</strong><p>{detail}</p></div><input type="checkbox" checked={value} onChange={event => onChange(event.target.checked)} /></label>; }
+
+function AppIcon({ name }: { name: 'back' | 'forward' | 'reload' | 'home' | 'plus' | 'settings' }) {
+  const paths = {
+    back: <path d="m15 18-6-6 6-6" />,
+    forward: <path d="m9 18 6-6-6-6" />,
+    reload: <><path d="M20 11a8 8 0 1 0-2.35 5.65"/><path d="M20 4v7h-7"/></>,
+    home: <><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10M9 20v-6h6v6"/></>,
+    plus: <><path d="M12 5v14"/><path d="M5 12h14"/></>,
+    settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.08 14H3v-4h.08A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.08V3h4v.08A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.37 9 1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></>,
+  };
+  return <svg className="app-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
+}

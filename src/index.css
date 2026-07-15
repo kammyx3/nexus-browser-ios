@@ -11,7 +11,7 @@ button,input,select { font:inherit; }
 button { color:inherit; }
 .ios-app { position:fixed; inset:0; background:var(--bg); }
 .mobile-toolbar { position:absolute; z-index:20; top:0; left:0; right:0; height:calc(54px + env(safe-area-inset-top)); padding:env(safe-area-inset-top) 8px 0; display:flex; gap:6px; align-items:center; background:color-mix(in srgb,var(--surface) 94%,transparent); border-bottom:1px solid var(--line); }
-.icon-button { width:38px; height:38px; border:0; border-radius:12px; background:transparent; font-size:27px; color:var(--muted); }
+.icon-button { width:38px; height:38px; padding:8px; display:grid; place-items:center; border:0; border-radius:12px; background:transparent; color:var(--muted); }
 .icon-button:disabled { opacity:.25; }
 .address-pill { flex:1; height:38px; display:flex; align-items:center; gap:7px; padding:0 12px; border-radius:13px; background:var(--card); border:1px solid var(--line); }
 .address-pill input { width:100%; min-width:0; border:0; outline:0; background:transparent; color:var(--text); font-size:14px; }
@@ -22,10 +22,13 @@ button { color:inherit; }
 .mobile-content { position:absolute; top:calc(54px + env(safe-area-inset-top)); bottom:calc(58px + env(safe-area-inset-bottom)); left:0; right:0; overflow:auto; background:var(--bg); }
 .bottom-toolbar { position:absolute; z-index:20; left:0; right:0; bottom:0; height:calc(58px + env(safe-area-inset-bottom)); padding:3px 8px env(safe-area-inset-bottom); display:grid; grid-template-columns:repeat(5,1fr); background:color-mix(in srgb,var(--surface) 96%,transparent); border-top:1px solid var(--line); }
 .bottom-toolbar button { min-width:0; padding:0; border:0; background:transparent; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; color:var(--muted); text-align:center; }
-.bottom-toolbar button>span { font-size:23px; line-height:25px; }
+.app-icon { display:block; width:23px; height:23px; flex:none; }
+.bottom-toolbar button>.app-icon { width:22px; height:22px; }
 .bottom-toolbar small { font-size:9px; }
 .bottom-toolbar .new-tab span { width:39px; height:39px; display:grid; place-items:center; border-radius:50%; color:white; background:var(--accent); margin-top:-13px; box-shadow:0 5px 18px #0006; }
-.tab-count { width:25px; height:25px; display:grid; place-items:center; border:2px solid currentColor; border-radius:7px; font-size:12px!important; }
+.bottom-toolbar .new-tab .app-icon { width:21px; height:21px; }
+.tab-count { position:relative; width:24px; height:22px; display:block; border:1.8px solid currentColor; border-radius:6px; }
+.tab-count>span { position:absolute; inset:0; display:grid; place-items:center; padding-top:.5px; font-size:11px; line-height:1; font-weight:700; font-variant-numeric:tabular-nums; }
 .home-screen { min-height:100%; padding:18vh 22px 30px; text-align:center; background:radial-gradient(circle at 50% 20%,#26375c 0,transparent 42%); }
 .home-screen img { display:block; width:74px; height:74px; margin:0 auto; object-fit:contain; }
 .home-screen h1 { margin:12px 0 3px; font-size:30px; }

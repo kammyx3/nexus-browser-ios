@@ -16,7 +16,7 @@ public class NexusBridgePlugin: CAPPlugin {
   private weak var capacitorWebView: WKWebView?
 
   private let proxyDefaults = UserDefaults.standard
-  private let proxyEnabledKey = "nexus.proxy.enabled"
+  private let proxyEnabledKey = "nexus.proxy.enabled.v2"
   private let proxyHostKey = "nexus.proxy.host"
   private let proxyPortKey = "nexus.proxy.port"
   private let proxyUsernameKey = "nexus.proxy.username"
