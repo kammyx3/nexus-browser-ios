@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: macos-15
+    env:
+      NEXUS_LIVE_RELOAD_URL: http://192.168.1.111:5173
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,6 +30,11 @@ jobs:
 
       - name: Sync Capacitor
         run: npx cap sync ios
+
+      - name: Verify live reload configuration
+        run: |
+          grep -q 'http://192.168.1.111:5173' ios/App/App/capacitor.config.json
+          echo "Live reload is configured for $NEXUS_LIVE_RELOAD_URL"
 
       - name: Verify Nexus native bridge
         run: |

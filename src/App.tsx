@@ -178,7 +178,7 @@ export default function App() {
 function Home({ onSearch }: { onSearch: (value: string) => void }) {
   const [value, setValue] = useState('');
   const suggestions = useMemo(() => readHistory().slice(0, 5), []);
-  return <div className="home-screen"><img src="./assets/logo.svg" alt="Nexus" /><h1>Nexus</h1><p>Private browsing, built for your phone.</p><form onSubmit={event => { event.preventDefault(); onSearch(value); }}><input value={value} onChange={event => setValue(event.target.value)} placeholder="Search the web" autoCapitalize="none" /><button>Go</button></form>{suggestions.length > 0 && <div className="suggestions">{suggestions.map((item: string) => <button key={item} onClick={() => onSearch(item)}>↗ {item}</button>)}</div>}</div>;
+  return <div className="home-screen"><img src="./assets/logo.svg" alt="Nexus" /><h1>Nexus</h1><p>Private Browsing for you!</p><form onSubmit={event => { event.preventDefault(); onSearch(value); }}><input value={value} onChange={event => setValue(event.target.value)} placeholder="Search the web" autoCapitalize="none" /><button>Go</button></form>{suggestions.length > 0 && <div className="suggestions">{suggestions.map((item: string) => <button key={item} onClick={() => onSearch(item)}>↗ {item}</button>)}</div>}</div>;
 }
 
 function Results({ query, results, category, onCategoryChange, onOpen }: { query: string; results: any[]; category: SearchCategory; onCategoryChange: (category: SearchCategory) => void; onOpen: (result: any) => void }) {
