@@ -79,4 +79,14 @@ button { color:inherit; }
 .privacy-note { padding-top:9px; border-top:1px solid var(--line); }
 .danger-button { width:100%; padding:13px; border:0; border-radius:13px; color:#ff8297; background:#ef47661a; }
 .skeleton { padding:17px 4px; border-bottom:1px solid var(--line); }.skeleton>* { display:block; height:10px; margin:8px 0; border-radius:5px; background:var(--card); animation:pulse 1.3s infinite; }.skeleton i{width:35%}.skeleton b{width:75%;height:16px}.skeleton span{width:95%}@keyframes pulse{50%{opacity:.45}}
+.result-categories { position:sticky; top:0; z-index:4; display:flex; gap:7px; padding:9px 0; overflow-x:auto; background:var(--bg); }
+.result-categories button { flex:none; padding:7px 13px; border:1px solid var(--line); border-radius:999px; background:var(--card); color:var(--muted); text-transform:capitalize; }
+.result-categories button.active { border-color:var(--accent); background:color-mix(in srgb,var(--accent) 15%,var(--card)); color:var(--text); }
+.pagination { display:flex; align-items:center; justify-content:center; gap:16px; padding:20px 0 8px; color:var(--muted); font-size:12px; }
+.pagination button { padding:9px 13px; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--text); }.pagination button:disabled{opacity:.35}
+.tab-buttons { display:flex; align-items:center; gap:2px; }.tab-buttons button { position:static!important; min-width:32px; }
+.tab-menu-backdrop { position:fixed; inset:0; z-index:90; display:flex; align-items:flex-end; padding:12px 12px calc(12px + env(safe-area-inset-bottom)); background:#0008; }
+.tab-menu { width:100%; overflow:hidden; border:1px solid var(--line); border-radius:18px; background:var(--surface); box-shadow:0 20px 60px #0008; }
+.tab-menu>strong { display:block; padding:14px 16px 10px; overflow:hidden; color:var(--muted); font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+.tab-menu>button { display:block; width:100%; padding:14px 16px; border:0; border-top:1px solid var(--line); background:transparent; color:var(--text); text-align:left; }.tab-menu>button:disabled{opacity:.35}.tab-menu>button.cancel{margin-top:7px;color:var(--accent);font-weight:700}
 @media (min-width:700px) { .tab-grid{grid-template-columns:repeat(3,1fr)}.sheet{max-width:700px;margin:auto}.home-screen{padding-top:22vh}.results{max-width:760px;margin:auto} }

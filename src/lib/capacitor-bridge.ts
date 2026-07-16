@@ -5,9 +5,9 @@ const isNative = Capacitor.isNativePlatform();
 
 // ─── Web Search ───
 
-export async function webSearch(query: string, count = 10, safeSearch = 'blur') {
+export async function webSearch(query: string, count = 10, safeSearch = 'blur', category = 'general') {
   if (!isNative) throw new Error('Private search is available in the Nexus iOS app.');
-  return NexusBridge.search({ query, count, safeSearch });
+  return NexusBridge.search({ query, count, safeSearch, category });
 }
 
 // ─── Native Bridge ───
@@ -30,7 +30,11 @@ class NativeBridge {
   constructor() {
     if (isNative) {
       window.addEventListener('nexus:browserState', ((e: CustomEvent) => {
-        const payload = (e as any).detail ?? e as any;
+        const raw = (e as any).detail ?? e as any;
+        let payload = raw;
+        if (typeof raw === 'string') {
+          try { payload = JSON.parse(raw); } catch { return; }
+        }
         if (!payload || !Array.isArray(payload.tabs)) return;
         const state: BrowserState = {
           tabId: typeof payload.tabId === 'string' ? payload.tabId : '',
@@ -48,11 +52,17 @@ class NativeBridge {
 
   onState(cb: StateCallback) {
     this.listeners.push(cb);
+    return () => { this.listeners = this.listeners.filter(listener => listener !== cb); };
   }
 
   async createWebView() {
     if (!isNative) return;
     try { await NexusBridge.createWebView(); } catch (e) { console.error('createWebView failed', e); }
+  }
+
+  async getState(): Promise<BrowserState> {
+    if (!isNative) return { tabId: '', url: '', title: '', isLoading: false, canGoBack: false, canGoForward: false, tabs: [] };
+    return NexusBridge.getState();
   }
 
   async navigate(url: string) {

@@ -132,9 +132,16 @@ public class NexusBridgePlugin: CAPPlugin {
       call.reject("Enter your Nexus VPS username and password in Settings first"); return
     }
     let safeSearch = call.getString("safeSearch") ?? "blur"
+    let category = call.getString("category") ?? "general"
     let safeValue = safeSearch == "filter" ? "2" : safeSearch == "off" ? "0" : "1"
     var components = URLComponents(string: "https://80-190-72-122.sslip.io/search")!
-    components.queryItems = [URLQueryItem(name: "q", value: query), URLQueryItem(name: "format", value: "json"), URLQueryItem(name: "categories", value: "general"), URLQueryItem(name: "safesearch", value: safeValue), URLQueryItem(name: "language", value: "en-US")]
+    let enginePools = [
+      "general": "bing,mojeek,yahoo,yep,mwmbl",
+      "images": "bing images,qwant images",
+      "videos": "bing videos,youtube,vimeo",
+      "news": "bing news,yahoo news"
+    ]
+    components.queryItems = [URLQueryItem(name: "q", value: query), URLQueryItem(name: "format", value: "json"), URLQueryItem(name: "categories", value: category), URLQueryItem(name: "engines", value: enginePools[category] ?? enginePools["general"]!), URLQueryItem(name: "safesearch", value: safeValue), URLQueryItem(name: "language", value: "all")]
     var request = URLRequest(url: components.url!)
     request.timeoutInterval = 25
     request.setValue("Basic \(Data("\(username):\(password)".utf8).base64EncodedString())", forHTTPHeaderField: "Authorization")

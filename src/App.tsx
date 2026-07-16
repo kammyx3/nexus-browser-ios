@@ -5,6 +5,7 @@ import { BrowserState, nativeBridge, webSearch } from './lib/capacitor-bridge';
 
 const isNative = Capacitor.isNativePlatform();
 type View = 'home' | 'loading' | 'results' | 'browsing';
+type SearchCategory = 'general' | 'images' | 'videos' | 'news';
 
 const emptyState: BrowserState = { tabId: '', url: '', title: '', isLoading: false, canGoBack: false, canGoForward: false, tabs: [] };
 const looksLikeUrl = (value: string) => /^https?:\/\//i.test(value) || (!/\s/.test(value) && /(?:\.|localhost)/i.test(value));
@@ -25,7 +26,9 @@ export default function App() {
   const [address, setAddress] = useState('');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<any[]>([]);
+  const [searchCategory, setSearchCategory] = useState<SearchCategory>('general');
   const [tabsOpen, setTabsOpen] = useState(false);
+  const [tabMenu, setTabMenu] = useState<BrowserTab | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dark, setDark] = useState(stored('nexus-theme') !== 'light');
   const [saveHistory, setSaveHistory] = useState(stored('nexus-save-history') !== 'false');
@@ -39,15 +42,22 @@ export default function App() {
   const [proxyMessage, setProxyMessage] = useState('');
 
   useEffect(() => {
-    nativeBridge.onState(state => {
+    let mounted = true;
+    const applyState = (state: BrowserState) => {
+      if (!mounted || !state || !Array.isArray(state.tabs)) return;
       setBrowser(state);
       if (state.url) { setAddress(state.url); setView('browsing'); }
-    });
-    nativeBridge.createWebView();
+    };
+    const unsubscribe = nativeBridge.onState(applyState);
+    (async () => {
+      await nativeBridge.createWebView();
+      try { applyState(await nativeBridge.getState()); } catch (error) { console.error('Initial browser state failed', error); }
+    })();
     nativeBridge.getProxyStatus().then(status => {
       setProxyEnabled(status.enabled); setProxySupported(status.supported);
       setProxyHost(status.host); setProxyPort(String(status.port)); setProxyUsername(status.username);
     }).catch(() => setProxySupported(false));
+    return () => { mounted = false; unsubscribe(); };
   }, []);
 
   const saveProxy = async () => {
@@ -64,7 +74,7 @@ export default function App() {
 
   useEffect(() => { document.documentElement.dataset.theme = dark ? 'dark' : 'light'; store('nexus-theme', dark ? 'dark' : 'light'); }, [dark]);
 
-  const search = useCallback(async (raw: string) => {
+  const search = useCallback(async (raw: string, category: SearchCategory = searchCategory) => {
     const value = raw.trim();
     if (!value) return;
     setTabsOpen(false);
@@ -76,13 +86,13 @@ export default function App() {
       store('nexus-history', JSON.stringify([value, ...previous].slice(0, 50)));
     }
     try {
-      const response = await webSearch(value, 30, safeSearch);
+      const response = await webSearch(value, 60, safeSearch, category);
       setResults(response.results || []);
     } catch (error) {
       setResults([{ title: 'Private search is not configured', url: 'nexus://settings', snippet: error instanceof Error ? error.message : 'Open Settings and enter your VPS credentials.', source: 'Nexus' }]);
     }
     setView('results');
-  }, [safeSearch, saveHistory]);
+  }, [safeSearch, saveHistory, searchCategory]);
 
   const newTab = async (incognito = false) => {
     await nativeBridge.createTab(undefined, incognito);
@@ -98,6 +108,10 @@ export default function App() {
   const home = async () => { await nativeBridge.hideWebView(); setAddress(''); setView('home'); };
   const openTabs = async () => { await nativeBridge.hideWebView(); setTabsOpen(true); };
   const closeTabs = async () => { setTabsOpen(false); if (view === 'browsing') await nativeBridge.showWebView(); };
+  const closeTabIds = async (ids: string[]) => {
+    for (const id of ids) await nativeBridge.closeTab(id);
+    setTabMenu(null);
+  };
   const openSettings = async () => { await nativeBridge.hideWebView(); setSettingsOpen(true); };
   const closeSettings = async () => { setSettingsOpen(false); if (view === 'browsing') await nativeBridge.showWebView(); };
   const tabCount = Math.max(1, browser.tabs?.length || 0);
@@ -116,7 +130,7 @@ export default function App() {
     <section className="mobile-content">
       {view === 'home' && <Home onSearch={search} />}
       {view === 'loading' && <ResultSkeleton />}
-      {view === 'results' && <Results query={query} results={results} onOpen={async result => {
+      {view === 'results' && <Results query={query} results={results} category={searchCategory} onCategoryChange={category => { setSearchCategory(category); search(query, category); }} onOpen={async result => {
         if (result.url === 'nexus://settings') { await openSettings(); return; }
         await nativeBridge.navigate(result.url); setView('browsing');
       }} />}
@@ -132,11 +146,12 @@ export default function App() {
 
     {tabsOpen && <Sheet title="Tabs" onClose={closeTabs}>
       <div className="sheet-actions"><button onClick={() => newTab(false)}>＋ New tab</button><button className="private" onClick={() => newTab(true)}>● Private tab</button></div>
-      <div className="tab-grid">{browser.tabs?.map(tab => <article key={tab.id} className={tab.id === browser.tabId ? 'active' : ''} onClick={() => selectTab(tab)}>
+      <div className="tab-grid">{browser.tabs?.map(tab => <article key={tab.id} className={tab.id === browser.tabId ? 'active' : ''} onClick={() => selectTab(tab)} onContextMenu={event => { event.preventDefault(); event.stopPropagation(); setTabMenu(tab); }}>
         <div className="tab-preview">{tab.incognito ? '●' : 'N'}</div>
         <div><strong>{tab.title || 'New Tab'}</strong><p>{tab.url || 'Nexus Home'}</p></div>
-        <button aria-label="Close tab" onClick={event => { event.stopPropagation(); nativeBridge.closeTab(tab.id); }}>×</button>
+        <div className="tab-buttons"><button aria-label="Tab actions" onClick={event => { event.stopPropagation(); setTabMenu(tab); }}>•••</button><button aria-label="Close tab" onClick={event => { event.stopPropagation(); nativeBridge.closeTab(tab.id); }}>×</button></div>
       </article>)}</div>
+      {tabMenu && <div className="tab-menu-backdrop" onClick={() => setTabMenu(null)}><div className="tab-menu" onClick={event => event.stopPropagation()}><strong>{tabMenu.title || 'New Tab'}</strong><button onClick={() => newTab(tabMenu.incognito)}>New {tabMenu.incognito ? 'private ' : ''}tab</button><button onClick={() => closeTabIds([tabMenu.id])}>Close tab</button><button disabled={browser.tabs.findIndex(tab => tab.id === tabMenu.id) >= browser.tabs.length - 1} onClick={() => { const index = browser.tabs.findIndex(tab => tab.id === tabMenu.id); closeTabIds(browser.tabs.slice(index + 1).map(tab => tab.id)); }}>Close tabs to the right</button><button disabled={browser.tabs.length <= 1} onClick={() => closeTabIds(browser.tabs.filter(tab => tab.id !== tabMenu.id).map(tab => tab.id))}>Close other tabs</button><button className="cancel" onClick={() => setTabMenu(null)}>Cancel</button></div></div>}
     </Sheet>}
 
     {settingsOpen && <Sheet title="Settings" onClose={closeSettings}>
@@ -166,9 +181,14 @@ function Home({ onSearch }: { onSearch: (value: string) => void }) {
   return <div className="home-screen"><img src="./assets/logo.svg" alt="Nexus" /><h1>Nexus</h1><p>Private browsing, built for your phone.</p><form onSubmit={event => { event.preventDefault(); onSearch(value); }}><input value={value} onChange={event => setValue(event.target.value)} placeholder="Search the web" autoCapitalize="none" /><button>Go</button></form>{suggestions.length > 0 && <div className="suggestions">{suggestions.map((item: string) => <button key={item} onClick={() => onSearch(item)}>↗ {item}</button>)}</div>}</div>;
 }
 
-function Results({ query, results, onOpen }: { query: string; results: any[]; onOpen: (result: any) => void }) {
+function Results({ query, results, category, onCategoryChange, onOpen }: { query: string; results: any[]; category: SearchCategory; onCategoryChange: (category: SearchCategory) => void; onOpen: (result: any) => void }) {
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(results.length / pageSize));
+  useEffect(() => setPage(1), [query, category, results]);
+  const visible = results.slice((page - 1) * pageSize, page * pageSize);
   const host = (url: string) => { try { return new URL(url).hostname; } catch { return url; } };
-  return <div className="results"><div className="results-heading"><h2>{query}</h2><span>{results.length} results</span></div>{results.length ? results.map((result, index) => <button className="result" key={`${result.url}-${index}`} onClick={() => onOpen(result)}><small>{host(result.url)}</small><strong>{result.title}</strong><p>{result.snippet}</p></button>) : <div className="empty"><strong>No results found</strong><p>Check your connection and try again.</p></div>}</div>;
+  return <div className="results"><div className="results-heading"><h2>{query}</h2><span>{results.length} results</span></div><div className="result-categories">{(['general','images','videos','news'] as SearchCategory[]).map(item => <button className={item === category ? 'active' : ''} onClick={() => onCategoryChange(item)} key={item}>{item === 'general' ? 'All' : item}</button>)}</div>{results.length ? <>{visible.map((result, index) => <button className="result" key={`${result.url}-${index}`} onClick={() => onOpen(result)}><small>{host(result.url)}</small><strong>{result.title}</strong><p>{result.snippet}</p></button>)}{totalPages > 1 && <div className="pagination"><button disabled={page === 1} onClick={() => setPage(value => value - 1)}>Previous</button><span>{page} of {totalPages}</span><button disabled={page === totalPages} onClick={() => setPage(value => value + 1)}>Next</button></div>}</> : <div className="empty"><strong>No results found</strong><p>Check your connection and try again.</p></div>}</div>;
 }
 function ResultSkeleton() { return <div className="results skeleton-list">{[1,2,3,4,5].map(item => <div className="skeleton" key={item}><i/><b/><span/></div>)}</div>; }
 function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) { return <div className="sheet-backdrop" onClick={onClose}><section className="sheet" onClick={event => event.stopPropagation()}><header><h2>{title}</h2><button onClick={onClose}>Done</button></header><div className="sheet-body">{children}</div></section></div>; }

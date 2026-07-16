@@ -23,7 +23,7 @@ export interface NexusBridgePlugin {
   }>;
   getProxyStatus(): Promise<ProxyStatus>;
   setProxy(options: ProxySettings): Promise<ProxyStatus>;
-  search(options: { query: string; count?: number; safeSearch?: string }): Promise<{ results: SearchResult[] }>;
+  search(options: { query: string; count?: number; safeSearch?: string; category?: string }): Promise<{ results: SearchResult[] }>;
 }
 
 export interface ProxySettings { enabled: boolean; host: string; port: number; username: string; password: string }
