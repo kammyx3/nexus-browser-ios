@@ -1,4 +1,5 @@
 import { CapacitorConfig } from '@capacitor/cli';
+const liveReloadUrl = process.env.NEXUS_LIVE_RELOAD_URL;
 
 const config: CapacitorConfig = {
   appId: 'com.nexus.browser',
@@ -10,6 +11,14 @@ const config: CapacitorConfig = {
       enabled: false,
     },
   },
+  ...(liveReloadUrl
+    ? {
+      server: {
+        url: liveReloadUrl,
+        cleartext: true,
+      },
+    }
+    : {}),
 };
 
 export default config;
